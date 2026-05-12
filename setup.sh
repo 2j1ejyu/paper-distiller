@@ -24,6 +24,11 @@ echo "[setup] Upgrading pip..."
 echo "[setup] Installing requirements..."
 "${VENV_DIR}/bin/pip" install --quiet -r "${HARNESS_DIR}/requirements.txt"
 
+# Playwright는 pip 설치 후 별도로 Chromium 바이너리를 받아야 한다.
+# 이미 받아둔 적이 있으면 빠르게 no-op.
+echo "[setup] Installing Playwright Chromium..."
+"${VENV_DIR}/bin/python" -m playwright install chromium
+
 # 3. 시스템 의존성 검사 (정보성 — 실패해도 setup 자체는 통과)
 echo ""
 echo "[setup] Checking system dependencies..."
@@ -36,15 +41,24 @@ else
   echo "  ✓ pandoc: $(pandoc --version | head -1)"
 fi
 
-# WeasyPrint는 cairo/pango/gdk-pixbuf 시스템 라이브러리가 있어야 import 가능
-echo -n "  WeasyPrint import test... "
-if "${VENV_DIR}/bin/python" -c "import weasyprint" 2>/dev/null; then
+# Playwright Chromium은 위에서 받았지만, 시스템 라이브러리(libnss3 등)가
+# 없으면 실제 실행 시 죽는다. 한 번 헤드리스 launch만 해봐서 검증.
+echo -n "  Playwright Chromium launch test... "
+if "${VENV_DIR}/bin/python" -c "
+import asyncio
+from playwright.async_api import async_playwright
+async def t():
+    async with async_playwright() as p:
+        b = await p.chromium.launch()
+        await b.close()
+asyncio.run(t())
+" 2>/dev/null; then
   echo "✓"
 else
   echo "✗"
-  echo "     WeasyPrint failed to import. Install system libs:"
-  echo "     macOS: brew install cairo pango gdk-pixbuf libffi"
-  echo "     Linux: apt install libpango-1.0-0 libpangoft2-1.0-0"
+  echo "     Chromium failed to launch. Missing system libs?"
+  echo "     Linux: ${VENV_DIR}/bin/python -m playwright install-deps chromium"
+  echo "     (또는 직접: apt install libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libasound2)"
 fi
 
 echo ""

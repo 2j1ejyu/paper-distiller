@@ -35,32 +35,6 @@ allowed-tools: Bash, Write, Edit, Read, Agent
 
 ---
 
-## Step 0: 의존성 확인 (셋업은 사용자가 수동 실행)
-
-`.venv`/의존성 셋업은 메인 Claude가 자동 실행하지 않는다. 사용자가 직접 `bash setup.sh`로 환경을 준비해 둔 상태여야 한다. 메인 Claude는 환경이 준비됐는지 **확인만** 한다:
-
-```bash
-# .venv 자체가 없으면 중단하고 사용자에게 setup.sh를 직접 돌려달라고 안내
-if [ ! -f "${HARNESS_DIR}/.venv/bin/python" ]; then
-  echo "Error: ${HARNESS_DIR}/.venv 가 없습니다. 먼저 'bash ${HARNESS_DIR}/setup.sh' 를 실행해 주세요." >&2
-  exit 1
-fi
-
-# 필수 패키지 import 가능 여부만 점검 (설치는 하지 않음)
-"${HARNESS_DIR}/.venv/bin/python" - <<'PY' || {
-  echo "Error: .venv에 필요한 패키지가 없습니다. 'bash setup.sh'를 다시 돌려 주세요." >&2
-  exit 1
-}
-import importlib
-for mod in ("fitz", "weasyprint", "docling"):
-    importlib.import_module(mod)
-PY
-```
-
-import이 실패하면 사용자에게 `bash setup.sh`를 다시 돌려달라고 안내하고 중단한다 — 메인 Claude가 pip install을 직접 실행하지 않는다.
-
----
-
 ## Step 1: 논문 확보
 
 다운로드는 셸 `curl`이 처리하고, Python은 PDF에서 slug를 뽑아 폴더로 정리하는 일만 한다.
