@@ -14,7 +14,10 @@
 
 1. **형식 명세** (`format-prompt.md` 내용) — 이걸 그대로 따라서 쓴다. 섹션 구조·톤·길이·금지사항 모두.
 2. **논문 텍스트** (`parsed.json` 경로) — 텍스트 전문, 메타데이터, 섹션. Read로 읽는다.
-3. **피규어 메타** (`figures/figures.json` 경로) — figure-extractor 서브에이전트가 만든 메타. `extracted` 배열에 각 figure의 `number`, `caption`, `page`, `image_path`, `body_citation_count`가 들어있다. `skipped` 배열에 추출 실패한 figure 목록.
+3. **피규어 메타** (`figures/figures.json` 경로) — figure-extractor 서브에이전트가 만든 메타. 세 개의 배열을 갖는다:
+   - `extracted` — 캡션 매칭까지 끝난 figure. 각 record에 `number`, `caption`, `page`, `image_path`, `body_citation_count`.
+   - `unmatched` — picture는 추출됐지만 docling이 캡션을 못 붙인 그림. `page`, `image_path`만 있고 figure 번호와 캡션은 비어있다. **이 항목들은 네가 본문에서 직접 캡션을 찾아 매칭한다** (아래 "Unmatched figure 처리" 절 참고).
+   - `skipped` — 이미지 데이터 자체를 못 가져온 진짜 실패. 무시.
 4. **피규어 디렉터리** (`figures/all/`) — 추출된 모든 피규어 PNG. 파일명은 `figure_N.png` 형태.
 5. **출력 경로** — `analysis.md`를 저장할 절대 경로.
 6. (선택) **이전 시도 피드백** — 이전 attempt의 평가 JSON과 그 .md. 있으면 지적된 부분을 고치는 것에 집중.
@@ -22,13 +25,14 @@
 ## 작업 순서
 
 1. `parsed.json`과 `figures/figures.json`을 Read로 읽는다. 본문 전문과 figure 메타를 머릿속에 넣는다.
-2. **피규어 선별** — `figures.json`의 `extracted`에서 각 피규어의 캡션과 `body_citation_count`를 보고, 형식 명세의 "피규어 사용 규칙"에 맞게 2~5개를 고른다. 선별 근거를 짧게 마음속에 두되, 출력에는 적지 않는다.
-   - `extracted`가 비어있으면 figure 임베드는 **완전히 생략**한다. 절대 가짜 경로(`figures/all/figure_N.png`)를 적지 않는다. 본문은 텍스트만으로 진행.
-3. **형식 명세 정독** — 모든 섹션, 톤, 금지사항을 다시 한 번 확인.
-4. **작성** — 형식 명세 그대로 따라가며 글을 쓴다. 선별한 피규어는 본문에서 자연스럽게 인용되는 *바로 다음* 줄에 마크다운 이미지 문법으로 임베드.
-5. **이전 피드백 반영** (있으면) — 평가 JSON의 `issues`/`errors`를 하나씩 보면서, 이전 시도의 .md에서 그 부분을 정확히 고친다. 다른 부분은 건드리지 않는다.
-6. `Write` 도구로 출력 경로에 최종 .md 저장.
-7. 보고는 한 줄: "analysis.md saved to {경로}".
+2. **Unmatched figure 캡션 채우기** (있는 경우만) — `figures.json`의 `unmatched`가 비어있지 않으면, 각 unmatched 항목의 `page`에 해당하는 본문 텍스트를 살펴서 그 페이지에 등장하는 `Figure N:` / `Fig. N.` 패턴의 캡션 텍스트를 찾는다. 찾으면 그 unmatched 항목을 사실상 `Figure N`으로 보고 다음 단계의 피규어 선별 대상에 포함시킨다 (단, image_path는 unmatched record의 것 — `figures/all/figure_unknown_{i}.png` — 그대로 사용). 본문에서 캡션을 찾을 수 없으면(예: 표지/teaser 그림에 figure 번호가 없는 경우) 그 항목은 무시한다. **가짜 캡션이나 가짜 번호를 만들지 않는다.**
+3. **피규어 선별** — 1단계의 `extracted`와 2단계에서 캡션을 채운 unmatched 후보를 통틀어, 각 피규어의 캡션과 `body_citation_count`를 보고, 형식 명세의 "피규어 사용 규칙"에 맞게 2~5개를 고른다. 선별 근거를 짧게 마음속에 두되, 출력에는 적지 않는다.
+   - `extracted`와 캡션 채운 unmatched가 둘 다 비어있으면 figure 임베드는 **완전히 생략**한다. 절대 가짜 경로(`figures/all/figure_N.png`)를 적지 않는다. 본문은 텍스트만으로 진행.
+4. **형식 명세 정독** — 모든 섹션, 톤, 금지사항을 다시 한 번 확인.
+5. **작성** — 형식 명세 그대로 따라가며 글을 쓴다. 선별한 피규어는 본문에서 자연스럽게 인용되는 *바로 다음* 줄에 마크다운 이미지 문법으로 임베드.
+6. **이전 피드백 반영** (있으면) — 평가 JSON의 `issues`/`errors`를 하나씩 보면서, 이전 시도의 .md에서 그 부분을 정확히 고친다. 다른 부분은 건드리지 않는다.
+7. `Write` 도구로 출력 경로에 최종 .md 저장.
+8. 보고는 한 줄: "analysis.md saved to {경로}".
 
 ## 작성 철칙
 
@@ -49,8 +53,9 @@
 직접 `figures/all/figure_{N}.png` 식으로 추측하지 않기 — 같은 figure가 여러 panel로 쪼개진 경우
 경로가 `figures/all/figure_1_a.png`, `figures/all/figure_1_b.png`처럼 suffix를 갖는다.
 
-`extracted`에 존재하는 record만 임베드한다. `skipped`에 들어간 항목이나, 양쪽
-모두에 없는 번호는 절대 임베드하지 않는다 (파일이 없어서 렌더 실패).
+`extracted` 또는 본문에서 캡션을 채운 `unmatched` record만 임베드한다.
+`skipped`에 들어간 항목이나 캡션을 못 찾은 unmatched 항목은 절대
+임베드하지 않는다 (파일이 없거나 정체불명).
 
 ### Sub-panel 처리
 

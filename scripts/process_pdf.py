@@ -10,14 +10,19 @@ DoclingDocument.
 
 Outputs (in ``--output`` directory):
   parsed.json — {metadata, full_text, sections, captions}
-  figures/figures.json — {extracted, skipped}
+  figures/figures.json — {extracted, unmatched, skipped}
   figures/all/figure_{N}.png — single-panel figures
   figures/all/figure_{N}_{a,b,...}.png — multi-panel figures
+  figures/all/figure_unknown_{i}.png — pictures docling couldn't match to a caption
 
 Caption resolution has two stages, in this order:
   1. docling's linked caption (``picture.caption_text(doc)``)
   2. fallback: geometric nearest-neighbour search among all caption items
      on the same page whose text starts with ``Figure N:`` / ``Fig. N.``.
+
+Pictures that fail both stages but still have image data go into ``unmatched``
+(image saved as ``figure_unknown_{i}.png``). The Writer subagent reconciles
+these against the body text when it summarises the paper.
 
 Multi-panel: when one Figure number matches multiple pictures on the SAME
 page, the union of their bounding boxes is rendered from the source PDF as
@@ -393,11 +398,34 @@ def _emit_panel(panel, number, suffix, out_dir, full_text):
     }
 
 
+def _emit_unmatched(item, index, out_dir):
+    """Save an unmatched picture as figure_unknown_{index}.png and return its record."""
+    png_rel = f"figures/all/figure_unknown_{index}.png"
+    png_path = out_dir / png_rel
+    png_path.parent.mkdir(parents=True, exist_ok=True)
+    pil = item["pil_img"]
+    with pil:
+        w, h = pil.width, pil.height
+        pil.save(png_path, format="PNG")
+    try:
+        file_size = png_path.stat().st_size
+    except OSError:
+        file_size = 0
+    return {
+        "page": item["page"],
+        "image_path": png_rel,
+        "width_px": w,
+        "height_px": h,
+        "file_size_bytes": file_size,
+    }
+
+
 def extract_figures(doc, captions, full_text, out_dir, pdf_path):
     pictures = list(getattr(doc, "pictures", []) or [])
     print(f"docling found {len(pictures)} pictures", file=sys.stderr)
 
     candidates = []
+    unmatched_items = []
     skipped = []
 
     for picture in pictures:
@@ -411,22 +439,16 @@ def extract_figures(doc, captions, full_text, out_dir, pdf_path):
 
         linked = _picture_caption(picture, doc)
         m = CAPTION_NUMBER_RE.match(linked or "")
+        number = None
+        caption_text = None
         if m:
             number = int(m.group(1))
             caption_text = linked
         else:
             chosen = _nearest_caption(captions, page_no, pbbox)
-            if chosen is None:
-                skipped.append(
-                    {
-                        "number": None,
-                        "page": page_no,
-                        "reason": "no caption linked or nearby",
-                    }
-                )
-                continue
-            number = chosen["number"]
-            caption_text = chosen["text"]
+            if chosen is not None:
+                number = chosen["number"]
+                caption_text = chosen["text"]
 
         try:
             pil_img = picture.get_image(doc)
@@ -439,6 +461,14 @@ def extract_figures(doc, captions, full_text, out_dir, pdf_path):
         if pil_img is None:
             skipped.append(
                 {"number": number, "page": page_no, "reason": "no image data"}
+            )
+            continue
+
+        if number is None:
+            # Caption matching failed — keep the image so the Writer can
+            # reconcile it against the body text later.
+            unmatched_items.append(
+                {"page": page_no, "bbox": pbbox, "pil_img": pil_img}
             )
             continue
 
@@ -482,7 +512,11 @@ def extract_figures(doc, captions, full_text, out_dir, pdf_path):
             suffix = chr(ord("a") + i)
             extracted.append(_emit_panel(p, number, suffix, out_dir, full_text))
 
-    return extracted, skipped
+    unmatched = []
+    for i, item in enumerate(unmatched_items, start=1):
+        unmatched.append(_emit_unmatched(item, i, out_dir))
+
+    return extracted, unmatched, skipped
 
 
 # ---- Main -------------------------------------------------------------------
@@ -524,13 +558,16 @@ def main():
     with open(parsed_path, "w", encoding="utf-8") as f:
         json.dump(parsed, f, ensure_ascii=False, indent=2)
 
-    extracted, skipped = extract_figures(
+    extracted, unmatched, skipped = extract_figures(
         doc, txt["captions"], txt["full_text"], out_dir, pdf_path
     )
     figures_json_path = out_dir / "figures" / "figures.json"
     with open(figures_json_path, "w", encoding="utf-8") as f:
         json.dump(
-            {"extracted": extracted, "skipped": skipped}, f, ensure_ascii=False, indent=2
+            {"extracted": extracted, "unmatched": unmatched, "skipped": skipped},
+            f,
+            ensure_ascii=False,
+            indent=2,
         )
 
     print(
@@ -542,6 +579,7 @@ def main():
                 "caption_count": len(txt["captions"]),
                 "page_count": metadata.get("page_count"),
                 "extracted": len(extracted),
+                "unmatched": len(unmatched),
                 "skipped": len(skipped),
             },
             ensure_ascii=False,
