@@ -30,19 +30,24 @@ from pathlib import Path
 
 
 CSS = """
-@page { size: A4; margin: 2cm; }
+@page { size: A4; margin: 2.5cm; }
 body {
     font-family: -apple-system, "Helvetica Neue", "Noto Sans KR", sans-serif;
-    line-height: 1.6;
+    line-height: 1.5;
     color: #222;
-    max-width: 560px;
     margin: 0 auto;
     font-size: 11pt;
     box-sizing: border-box;
 }
+/* 인쇄/PDF: body는 @page margin이 만든 콘텐츠 영역을 가득 채운다 (일반 논문 외관). */
+@media print {
+    body { max-width: none; }
+}
+/* 화면에서는 종이 느낌의 카드를 가운데 정렬. 폭은 A4 콘텐츠 영역 즈음. */
 @media screen {
     html { background: #eee; }
     body {
+        max-width: 760px;
         background: white;
         padding: 3em 4em;
         box-shadow: 0 0 12px rgba(0,0,0,.08);
@@ -215,7 +220,7 @@ def _maybe_break_display_math(body: str, max_chars: int) -> str | None:
 _DISPLAY_MATH_RE = re.compile(r"\$\$\s*(.+?)\s*\$\$", re.DOTALL)
 
 
-def break_long_display_math(md_text: str, max_chars: int = 70) -> str:
+def break_long_display_math(md_text: str, max_chars: int = 110) -> str:
     """Pre-process markdown: rewrite long $$...$$ blocks as aligned with
     line breaks at = (and at top-level +/- if needed)."""
     def repl(m: re.Match) -> str:
