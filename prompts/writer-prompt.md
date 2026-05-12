@@ -42,12 +42,28 @@
 ```markdown
 {본문에서 그림이 설명되는 문단}
 
-![Figure {N}: {핵심만 요약한 한국어 캡션}](figures/all/figure_{N}.png)
+![Figure {N}: {핵심만 요약한 한국어 캡션}]({extracted[i].image_path})
 ```
 
-경로는 항상 `figures/all/figure_{N}.png` (analysis.md 기준 상대 경로). 단,
-`figures.json`의 `extracted`에 존재하는 figure만 임베드한다. `skipped`에 들어간
-번호나, 둘 다에 없는 번호는 절대 임베드하지 않는다 (파일이 없어서 렌더 실패).
+**경로는 반드시 `figures.json` 각 record의 `image_path` 필드를 그대로 사용한다.**
+직접 `figures/all/figure_{N}.png` 식으로 추측하지 않기 — 같은 figure가 여러 panel로 쪼개진 경우
+경로가 `figures/all/figure_1_a.png`, `figures/all/figure_1_b.png`처럼 suffix를 갖는다.
+
+`extracted`에 존재하는 record만 임베드한다. `skipped`에 들어간 항목이나, 양쪽
+모두에 없는 번호는 절대 임베드하지 않는다 (파일이 없어서 렌더 실패).
+
+### Sub-panel 처리
+
+`extracted` 안의 record에 `"panel": "a"`처럼 letter suffix가 있으면, 같은 `number`를
+공유하는 sub-panel들이다 (예: Figure 1의 좌·우 패널). 캡션은 모두 동일하다. 처리 방법:
+
+- 본문에서 그 figure를 한 번 인용하고, panel record들을 **연속해서** 임베드:
+  ```markdown
+  ![Figure 1a: 좌측 패널 요약](figures/all/figure_1_a.png)
+  ![Figure 1b: 우측 패널 요약](figures/all/figure_1_b.png)
+  ```
+- 캡션 텍스트가 "Left: ... Right: ..." 처럼 panel별 설명을 담고 있으면, 각 임베드의
+  대체 텍스트에 해당 panel 설명만 짧게 한국어로 요약한다.
 
 ## 출력 형식
 

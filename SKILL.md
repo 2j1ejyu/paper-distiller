@@ -83,44 +83,30 @@ file "$TMP_PDF" | grep -q 'PDF document' || { echo "Error: not a PDF" >&2; exit 
 
 ---
 
-## Step 2: 파싱 + 피규어 추출
+## Step 2: 파싱 + 피규어 추출 (단일 docling 패스)
 
-텍스트 파싱(2a)과 figure 추출(2b)을 분리해 둘 다 결정론적 스크립트로 처리한다.
-
-### Step 2a: 텍스트·섹션·메타 파싱
+텍스트와 figure를 한 번의 docling 패스로 같이 뽑는다. PDF를 두 번 읽지 않는다.
 
 ```bash
-"${PYTHON}" "${HARNESS_DIR}/scripts/parse_pdf.py" "${PAPER_DIR}/paper.pdf" --output "${PAPER_DIR}"
+"${PYTHON}" "${HARNESS_DIR}/scripts/process_pdf.py" "${PAPER_DIR}/paper.pdf" --output "${PAPER_DIR}"
 ```
-
-생성물: `${PAPER_DIR}/parsed.json` (metadata, full_text, sections). 이 스크립트는
-PyMuPDF로 figure는 손대지 않고 텍스트만 뽑는다.
-
-### Step 2b: figure 추출 (결정론 스크립트)
-
-```bash
-"${PYTHON}" "${HARNESS_DIR}/scripts/extract_figures.py" \
-  --pdf "${PAPER_DIR}/paper.pdf" \
-  --output-dir "${PAPER_DIR}"
-```
-
-이 스크립트는 docling의 layout 모델로 PDF에서 picture element를 뽑아
-`${PAPER_DIR}/figures/all/figure_{N}.png`로 저장하고
-`${PAPER_DIR}/figures/figures.json`을 만든다. PDF별로 별도 스크립트를 작성하지
-않는다 — docling이 layout 다양성을 흡수한다.
-
-stdout JSON `{"extracted": N, "skipped": M, "figures_json": "..."}`은 로깅용.
-스크립트가 비정상 exit이거나 `figures/figures.json`이 없으면 메인 Claude가 빈 객체
-`{"extracted":[],"skipped":[]}`를 직접 그 경로에 만든다 (Writer가 파일 부재로
-죽지 않도록). 이 fallback에서는 Writer가 figure 임베드를 생략한다.
 
 생성물:
-- `${PAPER_DIR}/parsed.json` (Step 2a, 텍스트)
-- `${PAPER_DIR}/figures/all/figure_N.png` (추출된 figure들)
-- `${PAPER_DIR}/figures/figures.json` (figure 메타 — Writer가 읽음)
+- `${PAPER_DIR}/parsed.json` — metadata, full_text, sections, captions
+- `${PAPER_DIR}/figures/all/figure_{N}.png` (또는 multi-panel은 `figure_{N}_{a,b,...}.png`)
+- `${PAPER_DIR}/figures/figures.json` — `{extracted, skipped}` 메타 (Writer가 읽음)
 
-이전 워크플로의 figure-extractor 서브에이전트가 만들던 PDF별 dynamic 산출물은
-더 이상 만들지 않는다.
+내부 처리 요약:
+- layout 모델은 `DOCLING_LAYOUT_EGRET_XLARGE` (멀티 패널 sub-figure 탐지 안정성)
+- 캡션 매칭: docling이 picture에 link해준 캡션을 1차로 신뢰, 없으면 같은 page 안의
+  `Figure N:` 시작 텍스트 중 geometric center가 가장 가까운 것을 fallback으로 연결
+- 같은 figure number를 공유하는 picture가 ≥2개면 sub-panel로 저장 (top→bottom,
+  left→right 순으로 a, b, c… suffix 부여). figures.json record의 `image_path` 필드를
+  Writer가 그대로 사용한다.
+
+stdout JSON `{"parsed_path": "...", "figures_json": "...", "extracted": N, "skipped": M, ...}`은
+로깅용. 스크립트가 비정상 exit이면 메인 Claude는 작업을 중단한다 (parse 단계 실패는
+fallback이 없다 — 텍스트 없으면 writer가 작동 못 함).
 
 ---
 
