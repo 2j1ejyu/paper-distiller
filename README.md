@@ -1,6 +1,6 @@
 # paper-distiller
 
-A personal multi-agent harness that takes a single paper and produces one `.md` document formatted to your spec.
+A personal Claude Code workflow that turns one paper into one `.md` document formatted to your spec. The Python scripts here handle PDF parsing and rendering; the main Claude (following `SKILL.md`) drives the Writer/Evaluator loop. This is not a headless CLI — it runs inside Claude Code, with Claude as the orchestrator.
 
 ## Concept
 
@@ -8,7 +8,7 @@ A personal multi-agent harness that takes a single paper and produces one `.md` 
 - The **Writer subagent** reads `prompts/format-prompt.md` and writes `analysis.md` in that format, picking and embedding key figures itself.
 - The **Content Evaluator subagent** scores format compliance and factual accuracy by comparing the original PDF against `analysis.md` in a fresh context.
 - The **Render Evaluator subagent** scores visual integrity from screenshots of the rendered HTML.
-- Loops automatically until all three PASS (max 3 iterations).
+- The main Claude iterates up to 3 attempts until all three checks PASS (the loop lives in `SKILL.md`, not in code).
 - If you don't like the result, edit `prompts/format-prompt.md` — the new format applies from the next run.
 
 ## Layout
