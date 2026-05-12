@@ -1,0 +1,3 @@
+PyMuPDF>=1.23
+weasyprint>=60
+docling>=2.0
