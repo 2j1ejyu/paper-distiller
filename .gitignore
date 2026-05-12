@@ -5,7 +5,7 @@
 output/
 
 # Internal design/plan history — kept for the developer, not for distribution
-docs/superpowers/
+docs/
 
 # Python caches
 __pycache__/
