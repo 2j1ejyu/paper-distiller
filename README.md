@@ -1,6 +1,6 @@
-# paper-distiller
+# paper-distiller (ko)
 
-A personal Claude Code workflow that turns one paper into one `.md` document formatted to your spec. The Python scripts here handle PDF parsing and rendering; the main Claude (following `SKILL.md`) drives the Writer/Evaluator loop. This is not a headless CLI — it runs inside Claude Code, with Claude as the orchestrator.
+A personal Claude Code workflow that turns one paper into one Korean-language `.md` study note formatted to your spec. The Python scripts here handle PDF parsing and rendering; the main Claude (following `SKILL.md`) drives the Writer/Evaluator loop. This is not a headless CLI — it runs inside Claude Code, with Claude as the orchestrator.
 
 ## Concept
 
@@ -69,7 +69,13 @@ HTML → PDF rendering uses Playwright Chromium. On Linux, if the system librari
 
 ### 2. Analyze a paper
 
-With the project root as your cwd, ask the main Claude in natural language:
+Start Claude Code with permission prompts disabled — the workflow fires many tool calls (subagent dispatches, script runs, file edits) and stopping to approve each one breaks the loop:
+
+```bash
+claude --dangerously-skip-permissions
+```
+
+Then, with the project root as your cwd, ask the main Claude in natural language:
 
 ```
 Analyze this paper: https://arxiv.org/abs/1706.03762
